@@ -2,12 +2,13 @@
 
 var aws = require('aws-sdk')
 var s3 = new aws.S3({apiVersion: '2006-03-01'})
+var zlib = require('zlib')
+var parse = require('csv-parse/lib/sync');
 
 var _ = require('lodash')
 , async = require('async')
 , request = require('request')
 , Transform = require('stream').Transform
-, csv = require('csv-streamify')
 , JSONStream = require('JSONStream')
 
 // Set the tag 'loggly-customer-token'to set Loggly customer token on the S3 bucket.
@@ -44,7 +45,7 @@ exports.handler = function(event, context) {
     var key  = event.Records[0].s3.object.key;
     var size = event.Records[0].s3.object.size;
 
-    if ( size == 0 ) {
+    if ( size === 0 ) {
         console.log('S3ToLoggly skipping object of size zero')
     } 
     else {
@@ -88,11 +89,23 @@ exports.handler = function(event, context) {
                 }, next);
             },
 
+            function deflate(data, next) {
+              zlib.gunzip(data.Body, next);
+            },
+
             function upload(data, next) {
-                
-                // Stream the logfile to loggly.
+              // https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-access-logs.html#access-log-entry-format
+              var columns = 'type timestamp elb client:port target:port request_processing_time target_processing_time response_processing_time elb_status_code target_status_code received_bytes sent_bytes "request" "user_agent" ssl_cipher ssl_protocol target_group_arn trace_id';
+              var line = columns + "\n" + data.toString('utf-8');
+              var records = parse(line, {delimiter: ' ', columns: true});
+              var final = '';
+              records.map(function(record) {
+                final = final + JSON.stringify(record) + "\n";
+              });
+
+              // Stream the logfile to loggly.
                 var bufferStream = new Transform();
-                bufferStream.push(data.Body)
+                bufferStream.push(final)
                 bufferStream.end()
                 console.log( 'Using Loggly endpoint: ' + LOGGLY_URL )
 

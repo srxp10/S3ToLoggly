@@ -11,10 +11,10 @@
   "dependencies": 
   { 
     "async"         : "latest", 
-    "csv-streamify" : "latest",
     "JSONStream"    : "latest",
     "lodash"        : "latest",
-    "request"       : "latest"
+    "request"       : "latest",
+    "csv-parse"     : "latest"
   },
   "scripts": {
   }
